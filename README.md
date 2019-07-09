@@ -100,13 +100,13 @@ Access the AWS Athena console and execute the following query:
 SELECT * from waf_access_logs where action = 'BLOCK'
 ```
 
-You will see the details API requests that were blocked.
+You will see the details of the API requests that were blocked.
 
-Check the AWS docs to see several useful queries that can be executed onthe access logs: https://docs.aws.amazon.com/athena/latest/ug/waf-logs.html
+Check the AWS docs to see several useful queries that can be executed on the access logs: https://docs.aws.amazon.com/athena/latest/ug/waf-logs.html
 
 # Next Steps
 
-As mentioned before, the goal of this project is to show from start to end ways of protecting and monitoring your serverless APIs.
+As mentioned before the goal of this project is to show from start to end ways of protecting and monitoring your serverless APIs.
 
 There are several improvements that could be done based on this demo project, such as:
 
