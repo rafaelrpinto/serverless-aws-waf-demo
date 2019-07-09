@@ -1,0 +1,8 @@
+{
+  "name": "serverless-aws-waf-demo",
+  "version": "1.0.0",
+  "description": "Demo project on how to setup serverless APIs with AWS WAF and AWS Security Automations enabled",
+  "author": "Rafael Pinto <meuemail@posteo.pt>",
+  "readmeFilename": "README.md",
+  "license": "MIT"
+}

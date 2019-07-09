@@ -1,0 +1,110 @@
+service: lambda-waf-demo
+
+provider:
+  name: aws
+  runtime: nodejs10.x
+  stage: demo
+  region: us-east-1
+  deploymentBucket: lambda-waf-demo-us-east-1
+  # This API Key prevents requests targeting APIG directly to skip the WAF
+  apiKeys:
+    - value: mySecretApiKeyThatOnlyCloudFrontKnows
+      description: Api key that ensures that APIG is only accessed through CloudFormation
+
+functions:
+  hello:
+    handler: handler.hello
+    events:
+      - http:
+          path: hello
+          method: get
+          private: true
+
+resources:
+  Resources:
+    # S3 bucket that stores the CloudFront logs
+    CloudFrontAccessLogBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: lambda-waf-cloudfront-logs
+        AccessControl: Private
+
+    # WAF Security Automations stack
+    WafStack:
+      Type: "AWS::CloudFormation::Stack"
+      Properties:
+        TemplateURL: "https://s3.amazonaws.com/lambda-waf-demo-us-east-1/aws-waf-security-automations/v2.3.0/aws-waf-security-automations.template"
+        Parameters:
+          # We don't need this honeyepot for our API
+          ActivateBadBotProtectionParam: "no"
+          EndpointType: "CloudFront"
+          AppAccessLogBucket: !Ref CloudFrontAccessLogBucket
+          # We want to use Athena to query the access logs using SQL
+          ActivateHttpFloodProtectionParam: "yes - Amazon Athena log parser"
+          ActivateScannersProbesProtectionParam: "yes - Amazon Athena log parser"
+
+    # CloudFront distribution
+    # https://aws.amazon.com/premiumsupport/knowledge-center/api-gateway-cloudfront-distribution/
+    ApiDistribution:
+      Type: AWS::CloudFront::Distribution
+      Properties:
+        DistributionConfig:
+          # Associates the distribution with the WAF
+          WebACLId:
+            Fn::GetAtt: [WafStack, Outputs.WAFWebACL]
+          Origins:
+            - Id: ApiGateway
+              DomainName:
+                Fn::Join:
+                  - ""
+                  - - Ref: ApiGatewayRestApi
+                    - ".execute-api."
+                    - Ref: AWS::Region
+                    - ".amazonaws.com"
+              OriginPath:
+                Fn::Join:
+                  - ""
+                  - - "/"
+                    - ${self:provider.stage}
+              OriginCustomHeaders:
+                - HeaderName: X-API-Key
+                  HeaderValue: mySecretApiKeyThatOnlyCloudFrontKnows
+              CustomOriginConfig:
+                OriginProtocolPolicy: https-only
+          Enabled: true
+          HttpVersion: http2
+          PriceClass: PriceClass_100
+          Logging:
+            Bucket: !GetAtt CloudFrontAccessLogBucket.DomainName
+            IncludeCookies: true
+            Prefix: ""
+          DefaultCacheBehavior:
+            AllowedMethods:
+              - DELETE
+              - GET
+              - HEAD
+              - OPTIONS
+              - PATCH
+              - POST
+              - PUT
+            CachedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+            ForwardedValues:
+              QueryString: true
+              # Required when using cloufront.net domain
+              # on a custom domain ou can set "*" and disable caching
+              Headers:
+                - Accept
+                - Referer
+                - Athorization
+                - Content-Type
+              Cookies:
+                Forward: all
+            Compress: true
+            MinTTL: "0"
+            MaxTTL: "0"
+            DefaultTTL: "0"
+            TargetOriginId: ApiGateway
+            ViewerProtocolPolicy: https-only
